@@ -1,6 +1,10 @@
 const  express=require('express')
 const bodyParser=require('body-parser')
 const app=express()
+//引入cookie插件
+
+const cookieParser=require('cookie-parser') 
+app.use(cookieParser('123456')); //签名加密
 
 //模板引擎 'html' 是文件的后缀名  默认会在views 查找##.html文件
 app.engine('html', require('express-art-template'))
@@ -36,8 +40,6 @@ app.get('/template',function(req,res){
         content:"这是模板引擎的内容"
     })
 })
-
-
 
 
 app.listen('8080',function(){

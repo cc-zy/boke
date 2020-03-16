@@ -4,6 +4,10 @@ const promise=require('../mysql/promise.js')
 
 const os=require('os')
 
+
+const formatDate=require('../common/formatDate.js')
+
+
 //插入用户信息注册信息到注册表  接收两个传参 第一个账号 第二个密码
 router.post('/admin/register/insert',function(req,res){
     var account=req.body.account; 
@@ -115,49 +119,60 @@ router.post('/admin/wenzhang/update',function(req,res){
     })
 
 })
+//从wenzhang表里 统计总clicks
+//没有参数
+router.get('/admin/clicks',function(req,res){
+    var Sql="select wenzhang_youke_click_num as click_num from wenzhang";
+    var clicks=0;
+    promise.promiseSql(Sql).then(function(result){
+        if(result.length>0){
+            result.forEach(function(item){
+                clicks+=item.click_num
+            })
+            res.json({status:0,clicks:clicks})
+        }else{
+            res.json({status:0,clicks:clicks})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+    })
+})
+
+
 
 //从wenzhang表更新一个字段数据  访问的文章流量 
 //参数 文章id 
-//第一去fangwen表里看看游客ip是否已经来看过文章，看过则不更新文章浏览量
-//第二游客ip没看过则插入这个游客信息到fangwen表，和更新文章浏览量
+//第一游客cookie中的文章id是否存在，存在则不更新文章浏览量
+//第二如果不存在设置cookie并存储wenzhang_id  和插入游客ip并更新文章浏览量 
+//cookie 今天到期
 router.get('/youke/wenzhang/ip',function(req,res){
     var arr_ip=req.ip.split(":"); 
     var wenzhang_id=req.query.id;
     var youke_ip=arr_ip[arr_ip.length-1]; //获取ip
-    var Sql='select * from  fangwen   where youke_ip=?';
-    var Params=[youke_ip];
-    promise.promiseParams(Sql,Params).then(function(result){
-        console.log(result.length)
-        if(result.length>0){ //当该游客已经访问过这个文章 则文章ip不加1
-            res.json({status:0})  //访问成功!
-            console.log(result)
-        }else if(result.length==0){
-            var Sql="insert into fangwen(youke_ip,wenzhang_id) values(?,?)";
-            var Params=[youke_ip,wenzhang_id]
-            promise.promiseParams(Sql,Params).then(function(result){ //插入一条数据 在游客表
-                if(result.affectedRows){ //如果插入成功！就更新一下文章的浏览量
-                    var Sql="update wenzhang set wenzhang_youke_ip_num=wenzhang_youke_ip_num+1 where wenzhang_id=?";
-                    var Params=[wenzhang_id];
-                    promise.promiseParams(Sql,Params).then(function(result){
-                        if(result.affectedRows){ //如果返回affectedRows,说明更新成功!
-                            res.json({status:0})
-                        }else{
-                            res.json({status:1})
-                        }
-                    },function(err){
-                        if(err)res.json({status:1})
-                    })
-                }
-            },function(err){
-                res.json({status:1}) 
-            })   
-        }else{
-            res.json({status:1})    
-        }
-    },function(err){
-        if(err)res.json({status:1})
-        throw(err)
-    })
+    if(req.signedCookies.tokenid==wenzhang_id){ //文章对应的cookie存在则不插入游客ip
+        res.json({status:0})
+    }  else{
+        var time=formatDate.Timecha();
+        res.cookie("tokenid",wenzhang_id,{maxAge:time,signed:true,httpOnly:false});
+        var Sql="insert into fangwen(youke_ip,wenzhang_id) values(?,?)";
+        var Params=[youke_ip,wenzhang_id]
+        promise.promiseParams(Sql,Params).then(function(result){ //插入一条数据 在游客表
+            if(result.affectedRows){ //如果插入成功！就更新一下文章的浏览量
+                var Sql="update wenzhang set wenzhang_youke_ip_num=wenzhang_youke_ip_num+1 where wenzhang_id=?";
+                var Params=[wenzhang_id];
+                promise.promiseParams(Sql,Params).then(function(result){
+                    if(result.affectedRows){ //如果返回affectedRows,说明更新成功!
+                        res.json({status:0})
+                    }else{
+                        res.json({status:1})
+                    }
+                })
+            }
+        }).catch(function(err){
+           if(err) res.json({status:1})
+        })   
+    } 
+    
 })
 //从wenzhang表里更新一条数据 
 //获取的参数两个是isclick wenzhang_id 
@@ -224,6 +239,87 @@ router.get('/youke/wenzhang/sort',function(req,res){
         if(err)res.json({status:1})
     })
 })
+//从wenzhang表里    查询数据
+//参数 pageIndex=1  sort 排序类别   isdesc=0 底到高排序 isdesc=1高到底
+//sort=ip 按流量排序 sort=create_time按时间排序
+//sort=click 按点赞排序 
+router.get('/youke/wenzhang/select/sort',function(req,res){
+    var pageIndex=(req.query.pageIndex-1)*10;
+    var sort=req.query.sort;
+    var isdesc=req.query.isdesc;
+    var paixu;//升序还是降序
+    switch(sort){  
+        case  "ip":
+            sort='wenzhang_youke_ip_num';
+            break;
+        case "create_time":
+            sort='wenzhang_create_time';
+            break;
+        case "click":
+            sort='wenzhang_youke_click_num';
+            break;
+        default :
+            res.json({status:1}) //传参传错
+            break;
+    }
+    if(isdesc==0){
+        paixu='desc'; 
+    }else if(isdesc==1){
+        paixu='asc';
+    }else{
+        res.json({status:1})//传参传错
+        return;  //当传参值报错则停止下面的程序执行
+    }
+    var Params=[pageIndex];
+    var Sql="select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time,wenzhang_youke_ip_num"+
+    ",wenzhang_youke_click_num from wenzhang   order by "+ sort+" "+paixu+" limit ?,10";
+    promise.promiseParams(Sql,Params).then(function(result){
+        if(result.length>0){
+            res.json(result)
+        }else {
+            res.json({status:1})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+    })
+
+})
+//从wenzhang表里 查询数据
+//参数 sort 类别  
+//默认按流量排序  sort=javascript
+//sort=html sort=css vue node sort=qita
+router.get('/youke/wenzhang/select/sorts',function(req,res){
+    var sort=req.query.sort;
+    var Sql=" select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time,wenzhang_youke_ip_num "
+    +" from wenzhang  where wenzhang_sort = ? order by  wenzhang_youke_ip_num desc ";
+    var Params=[sort];
+    promise.promiseParams(Sql,Params).then(function(result){
+        if(result.length>0){
+            res.json(result)
+        }else{
+            res.json({status:1})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+    })
+})
+//从wenzhang表里  根据wenzhang_id查询数据
+//动态params id
+router.get("/youke/wenzhang/select/:id",function(req,res){
+    var wenzhang_id=req.params.id;
+    var Sql="select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time from wenzhang where wenzhang_id=?";
+    var Params=[wenzhang_id];
+    promise.promiseParams(Sql,Params).then(function(result){
+        if(result.length){
+            res.json(result)
+        }else{
+            res.json({status:1})
+        }
+    },function(err){
+        res.json({status:1})
+    })
+})  
+
 
 //从images表里 插入一条数据
 //参数 img_url图片地址 img_position图片位置
@@ -298,11 +394,72 @@ router.post('/admin/wenzhang_caogao/update',function(req,res){
     })
 })
 
-
-
-
-
-
+//从wenzhang_caogao表里查询数据 
+//参数 pageIndex 页数 pageIndex=1查询前10十条信息
+router.get('/admin/wenzhang_caogao/select',function(req,res){
+    var pageIndex=req.query.pageIndex;
+    var offset=(pageIndex-1)*10;
+    var dataNum=10;
+    var Sql="select wenzhang_caogao_id,wenzhang_caogao_title,wenzhang_caogao_content,wenzhang_caogao_content_html,wenzhang_caogao_change_time"+
+    "  from wenzhang_caogao limit ?,?";
+    var Params=[offset,dataNum];
+    promise.promiseParams(Sql,Params).then(function(result){
+        if(result.length>0){
+           res.json(result)
+        }else{
+            res.json({status:1})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+    })
+})
+//youke表是统计除了文章外的页面游客 插入一条数据
+//第一先判断游客cookie是否已经在youke表存在,如果存在则不插入信息
+//第二如果不存在则插入信息
+router.get("/youke/insert",function(req,res){
+    var arr_ip=req.ip.split(":");
+    var youke_ip=arr_ip[arr_ip.length-1]; //获取ip
+    if(req.signedCookies.token){  //游客存在cookie则不插入游客信息
+        res.json({status:0})
+    }else{ //游客信息不存在  插入游客信息
+        var time=formatDate.Timecha();
+        var settime=new Date().getTime();//时间戳
+        res.cookie('token',settime,{maxAge:time,signed:true,httpOnly:false});
+        var Sql="insert into youke values(null,?,now())";
+        var Params=[youke_ip];
+        promise.promiseParams(Sql,Params).then(function(result){
+            if (result.affectedRows) {
+                res.json({status:0})
+            }
+        },function(err){
+            if(err)res.json({status:1})
+        })
+    }
+})
+//从youke表和fangwen表里 统计总流量 ip
+router.get("/admin/ips",function(req,res){
+    var count=0;
+    var Sql="select count(youke_ip) as ips from youke";
+    promise.promiseSql(Sql).then(function(result){
+        if(result.length>0){
+            count+=result[0].ips
+        }else{
+            count=0
+        }
+        var Sql="select count(youke_ip) as ips from fangwen";
+        return promise.promiseSql(Sql)
+    }).then(function(result){
+        if(result.length>0){
+            count+=result[0].ips
+            res.json({status:0,count:count})
+        }else{
+            res.json({status:0,count:count})
+        }
+    }).catch(function(err){
+        if(err)res.json({status:1})
+    })
+})
+//没有参数
 
 
 
