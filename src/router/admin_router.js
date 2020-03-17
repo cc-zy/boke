@@ -496,6 +496,70 @@ router.post('/admin/login',function(req,res){
         })
     }
 })
+//在comments表里 插入一条评论 
+//参数 id   name content 文章的id 评论者的名字 评论内容
+router.post('/youke/comments/insert',function(req,res){
+    var wenzhang_id=req.body.id;
+    var comment_name=req.body.name;
+    var comment_content=req.body.content;
+    var Sql="insert into comments values(null,?,?,?,now())";
+    var Params=[wenzhang_id,comment_content,comment_name];
+    promise.promiseParams(Sql,Params).then(function(result){
+        if(result.affectedRows){
+            res.json({status:0})
+        }else{
+            res.json({status:1})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+    })
+})
+//在user_name中 插入一条数据
+//第一先判断comment_name是否存在
+//不存在，则插入一条评论信息  //把comment_name保存在浏览器本地
+//存在则返回 hasName=true 名字存在
+//参数  name 评论名
+router.get('/youke/user_name/insert',function(req,res){
+    if(req.query.name==null){
+        res.json({status:2})
+        return;
+    }
+    var comment_name=req.query.name;
+    var Sql="select * from user_name where comment_name=?";
+    var Params=[comment_name];
+    promise.promiseParams(Sql,Params).then(function(result){
+        if(result.length>0){
+            res.json({hasName:true})
+        }else if(result.length==0){
+            var Sql="insert into user_name values(null,?)";
+            var Params=[comment_name];
+            promise.promiseParams(Sql,Params).then(function(result){
+                if(result.affectedRows){
+                    res.json({status:0})
+                }
+            })
+        }
+    }).catch(function(err){
+        if(err)res.json({status:1})
+    })
+})
+//从user_name表查询 评论注册人数
+//参数 无
+router.get('/admin/user_name/num',function(req,res){
+    var Sql="select count(comment_name) as names from user_name";
+    var count=0;
+    promise.promiseSql(Sql).then(function(result){
+        if(result.length>0){
+            count+=result[0].names
+            res.json({status:0,count:count})
+        }else{
+            res.json({status:0,count:count})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+    })
+})
+
 
 
 
