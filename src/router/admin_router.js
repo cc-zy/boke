@@ -54,7 +54,6 @@ router.post('/admin/register/update',function(req,res){
         }else{
             res.json({status:1}) //可能是账号有错
         }
-        console.log(result)
     },function(err){
         if(err)res.json({status:1})  //更新失败 
     })
@@ -274,11 +273,7 @@ router.get('/youke/wenzhang/select/sort',function(req,res){
     var Sql="select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time,wenzhang_youke_ip_num"+
     ",wenzhang_youke_click_num from wenzhang   order by "+ sort+" "+paixu+" limit ?,10";
     promise.promiseParams(Sql,Params).then(function(result){
-        if(result.length>0){
-            res.json(result)
-        }else {
-            res.json({status:1})
-        }
+            res.json({status:0,result}) 
     },function(err){
         if(err)res.json({status:1})
     })
@@ -294,11 +289,7 @@ router.get('/youke/wenzhang/select/sorts',function(req,res){
     +" from wenzhang  where wenzhang_sort = ? order by  wenzhang_youke_ip_num desc ";
     var Params=[sort];
     promise.promiseParams(Sql,Params).then(function(result){
-        if(result.length>0){
-            res.json(result)
-        }else{
-            res.json({status:1})
-        }
+            res.json({status:0,result})
     },function(err){
         if(err)res.json({status:1})
     })
@@ -310,11 +301,9 @@ router.get("/youke/wenzhang/select/:id",function(req,res){
     var Sql="select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time from wenzhang where wenzhang_id=?";
     var Params=[wenzhang_id];
     promise.promiseParams(Sql,Params).then(function(result){
-        if(result.length){
-            res.json(result)
-        }else{
-            res.json({status:1})
-        }
+
+            res.json({status:0,result})
+
     },function(err){
         res.json({status:1})
     })
@@ -355,6 +344,21 @@ router.get("/admin/images/delete",function(req,res){
         res.json({status:1})
     })
 })
+//从images表里 查询数据 根据img_position图片位置
+//参数 img_position
+//img_position=left,right,bottom,top四种
+router.get('/youke/images/select',function(req,res){
+    var img_position=req.query.img_position;
+    var Sql="select img_id,img_url from  images where img_position=?";
+    var Params=[img_position];
+    promise.promiseParams(Sql,Params).then(function(result){
+        res.json({status:0,result})
+    },function(err){
+        if(err)res.json({status:1})
+    })
+})
+
+
 //从wenzhang_caogao表里插入一条数据 保存草稿
 //参数 title content content_html 
 router.post('/admin/wenzhang_caogao/insert',function(req,res){
@@ -404,11 +408,9 @@ router.get('/admin/wenzhang_caogao/select',function(req,res){
     "  from wenzhang_caogao limit ?,?";
     var Params=[offset,dataNum];
     promise.promiseParams(Sql,Params).then(function(result){
-        if(result.length>0){
-           res.json(result)
-        }else{
-            res.json({status:1})
-        }
+  
+           res.json({status:0,result})
+        
     },function(err){
         if(err)res.json({status:1})
     })
@@ -437,6 +439,7 @@ router.get("/youke/insert",function(req,res){
     }
 })
 //从youke表和fangwen表里 统计总流量 ip
+//没有参数
 router.get("/admin/ips",function(req,res){
     var count=0;
     var Sql="select count(youke_ip) as ips from youke";
@@ -459,7 +462,42 @@ router.get("/admin/ips",function(req,res){
         if(err)res.json({status:1})
     })
 })
-//没有参数
+//从admin_login表 插入一条数据和在注admin_register表里查询用户是否存在
+//参数 account账号 password密码
+router.post('/admin/login',function(req,res){
+    var admin_user_account=req.body.account;
+    var admin_user_password=req.body.password;
+    var Sql="select * from admin_register where admin_user_account=? && admin_user_password=?";
+    var Params=[admin_user_account,admin_user_password];
+    if(req.signedCookies.istoken){
+        res.json({status:0,token:true})
+    }else{
+        promise.promiseParams(Sql,Params).then(function(result){
+            if(result.length>0){
+                var settime=new Date().getTime();//时间戳
+                res.cookie('istoken',settime,{maxAge:1000*60*60*24*7,signed:true,httpOnly:false});//有效期七天
+                //插入登录信息
+                var Sql="insert into admin_login values(null,?,?,now())";
+                var Params=[admin_user_account,admin_user_password];
+                promise.promiseParams(Sql,Params).then(function(result){
+                    if(result.affectedRows){
+                        res.json({status:0,token:true})
+                    }else{
+                        res.json({status:1})
+                    }
+                },function(err){
+                    if(err)res.json({status:1})
+                })
+            }else{
+                res.json({status:1,token:false})//token=false 密码或账号输入错误!
+            }
+        },function(err){
+            if(err)res.json({status:1,token:false})//token=false 密码或账号输入错误!
+        })
+    }
+})
+
+
 
 
 
