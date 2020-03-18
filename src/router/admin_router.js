@@ -497,13 +497,14 @@ router.post('/admin/login',function(req,res){
     }
 })
 //在comments表里 插入一条评论 
-//参数 id   name content 文章的id 评论者的名字 评论内容
+//参数 id   name content parent_id文章的id 评论者的名字 评论内容 父级评论 0为父级
 router.post('/youke/comments/insert',function(req,res){
     var wenzhang_id=req.body.id;
     var comment_name=req.body.name;
     var comment_content=req.body.content;
-    var Sql="insert into comments values(null,?,?,?,now())";
-    var Params=[wenzhang_id,comment_content,comment_name];
+    var parent_id=req.body.parent_id;
+    var Sql="insert into comments values(null,?,?,?,now(),?)";
+    var Params=[wenzhang_id,comment_content,comment_name,parent_id];
     promise.promiseParams(Sql,Params).then(function(result){
         if(result.affectedRows){
             res.json({status:0})
@@ -559,10 +560,64 @@ router.get('/admin/user_name/num',function(req,res){
         if(err)res.json({status:1})
     })
 })
-
-
-
-
+//从 comments 表里查询评论信息 
+// 参数 id 文章id
+router.get('/youke/comments/select',function(req,res){
+    var wenzhang_id=req.query.id;
+    var params=[wenzhang_id];
+    var Sql="select comment_id,comment_content,comment_name,parent_id from comments where wenzhang_id=?";
+    promise.promiseParams(Sql,params).then(function(result){
+        if(result.length>0){
+            let  map = {}, root = [], i;
+            for(i = 0; i < result.length; i++) {
+                map[result[i].comment_id] = i
+                result[i].children = []
+            }
+            console.log(result)
+            for(i = 0; i < result.length; i++) {
+                const  node = result[i];
+                if(result[i].parent_id != 0) {
+                    result[map[node.parent_id]].children.push(node)
+                }else {
+                    root.push(node)
+                }
+            }
+            res.json({status:0,root})
+        }else{
+            res.json({status:1})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+        throw(err)
+    })
+    
+})
+//从 comments表里删除一条信息
+//如果是一级评论则把二级的也删了
+//如果是二级直接删二级
+//参数 comment_id 
+router.get('/admin/comments/delete',function(req,res){
+    var comment_id=req.query.comment_id;
+    var Sql="delete from comments where comment_id=?";
+    var Params=[comment_id];
+    promise.promiseParams(Sql,Params).then(function(result){
+        if(result.affectedRows){
+            var Sql="delete from comments where parent_id=?";
+            promise.promiseParams(Sql,Params).then(function(result2){
+                if(result2.affectedRows){
+                    res.json({status:0})
+                }else{
+                    res.json({status:0})
+                }
+            })
+        }else{
+          res.json({status:1})
+        }
+    }).catch(function(err){
+        if(err)res.json({status:1})
+        throw(err)
+    })
+})
 
 
 
