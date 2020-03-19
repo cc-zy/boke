@@ -16,7 +16,7 @@ app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
 //前台路由
-const router=require('./src/router/router.js')
+const router=require('./src/router/youke_router.js')
 //路由挂载到express上
 app.use(router)
 
@@ -27,11 +27,11 @@ app.use(AdminRouter)
 //第一个参数是路由  第二个是静态资源的根目录
 app.use('/views',express.static('./src/views/'))
 
-app.get('/',function(req,res){
+// app.get('/',function(req,res){
 
-    res.status(404).render('index.html')  //渲染一个html
+//     res.status(404).render('index.html')  //渲染一个html
     
-})
+// })
 
 //模板引擎的使用
 app.get('/template',function(req,res){

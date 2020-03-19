@@ -2,10 +2,6 @@ const express=require('express')
 const router=express.Router()
 const promise=require('../mysql/promise.js')
 
-const os=require('os')
-
-
-const formatDate=require('../common/formatDate.js')
 
 
 //插入用户信息注册信息到注册表  接收两个传参 第一个账号 第二个密码
@@ -43,7 +39,6 @@ router.get('/admin/register/delete',function(req,res){
 
 //从注册表更新一条数据  修改密码  接收两个个传参 用户的新的密码和原来的 账号
 router.post('/admin/register/update',function(req,res){
-    console.log(req.body.password)
     var password=req.body.password;
     var account=req.body.account;
     var Params=[password,account];
@@ -96,7 +91,7 @@ router.get('/admin/wenzhang/delete',function(req,res){
     })
 })
 //从wenzhang表里更新一条数据 修改文章
-//参数有四个 标题 内容 html内容 分类 id 更新的时间
+//参数有五个 标题 内容 html内容 分类 id 更新的时间
 
 router.post('/admin/wenzhang/update',function(req,res){
     var wenzhang_title=req.body.wenzhang_title;
@@ -114,7 +109,6 @@ router.post('/admin/wenzhang/update',function(req,res){
         }
     },function(err){
         if(err) res.json({status:1}) //更新失败
-        console.log(err)
     })
 
 })
@@ -136,113 +130,24 @@ router.get('/admin/clicks',function(req,res){
         if(err)res.json({status:1})
     })
 })
-
-
-
-//从wenzhang表更新一个字段数据  访问的文章流量 
-//参数 文章id 
-//第一游客cookie中的文章id是否存在，存在则不更新文章浏览量
-//第二如果不存在设置cookie并存储wenzhang_id  和插入游客ip并更新文章浏览量 
-//cookie 今天到期
-router.get('/youke/wenzhang/ip',function(req,res){
-    var arr_ip=req.ip.split(":"); 
-    var wenzhang_id=req.query.id;
-    var youke_ip=arr_ip[arr_ip.length-1]; //获取ip
-    if(req.signedCookies.tokenid==wenzhang_id){ //文章对应的cookie存在则不插入游客ip
-        res.json({status:0})
-    }  else{
-        var time=formatDate.Timecha();
-        res.cookie("tokenid",wenzhang_id,{maxAge:time,signed:true,httpOnly:false});
-        var Sql="insert into fangwen(youke_ip,wenzhang_id) values(?,?)";
-        var Params=[youke_ip,wenzhang_id]
-        promise.promiseParams(Sql,Params).then(function(result){ //插入一条数据 在游客表
-            if(result.affectedRows){ //如果插入成功！就更新一下文章的浏览量
-                var Sql="update wenzhang set wenzhang_youke_ip_num=wenzhang_youke_ip_num+1 where wenzhang_id=?";
-                var Params=[wenzhang_id];
-                promise.promiseParams(Sql,Params).then(function(result){
-                    if(result.affectedRows){ //如果返回affectedRows,说明更新成功!
-                        res.json({status:0})
-                    }else{
-                        res.json({status:1})
-                    }
-                })
-            }
-        }).catch(function(err){
-           if(err) res.json({status:1})
-        })   
-    } 
-    
-})
-//从wenzhang表里更新一条数据 
-//获取的参数两个是isclick wenzhang_id 
-//如果isclick=0 则根据youke_ip从访问表的youke_click字段增加1和根据文章id从wenzhang表的里增加1  ::youke_ip已经在访问的时候插入到fangwen表里
-//如果isclick=1则减1
-router.get('/youke/wenzhang/click',function(req,res){
-    var arr_ip=req.ip.split(":");
-    var youke_ip=arr_ip[arr_ip.length-1]; //获取ip
-    var isclick=req.query.isclick;
-    var wenzhang_id=req.query.wenzhang_id; 
-    if(isclick==0){
-        let Sql="update wenzhang set wenzhang_youke_click_num=wenzhang_youke_click_num+1 where wenzhang_id=?";
-        let Params=[wenzhang_id]; 
-        promise.promiseParams(Sql,Params).then(function(result){ //更新wenzhang表的click
-            if(result.affectedRows){
-                let Sql="update fangwen set youke_click=youke_click+1 where youke_ip=?";
-                let Params=[youke_ip]; 
-                return promise.promiseParams(Sql,Params)//更新fangwen表的click
-            }else{
-                res.json({status:1})
-            }
-        }).then(function(result){
-            if(result.affectedRows){
-                res.json({status:0})
-            }
-        }).catch(function(err){
-            if(err)res.json({status:1})
-        })
-    }else{
-        let Sql="update wenzhang set wenzhang_youke_click_num=wenzhang_youke_click_num-1 where wenzhang_id=?";
-        let Params=[wenzhang_id]; 
-        promise.promiseParams(Sql,Params).then(function(result){ //更新wenzhang表的click
-            if(result.affectedRows){
-                let Sql="update fangwen set youke_click=youke_click-1 where youke_ip=?";
-                let Params=[youke_ip]; 
-                return promise.promiseParams(Sql,Params)//更新fangwen表的click
-            }else{
-                res.json({status:1})
-            }
-        }).then(function(result){
-            if(result.affectedRows){
-                res.json({status:0})
-            }
-        }).catch(function(err){
-            if(err)res.json({status:1})
-        })
-    }
-})
-//从wenzhang表里更新 wenzhang_sort字段
-//参数 sort分类 id 
-//根据id从wenzhang表里更新wenzhang_sort字段
-router.get('/youke/wenzhang/sort',function(req,res){
-    var wenzhang_sort=req.query.sort;
-    var wenzhang_id=req.query.id;
-    var Sql="update wenzhang set wenzhang_sort=? where wenzhang_id=?";
-    var Params=[wenzhang_sort,wenzhang_id];
-    promise.promiseParams(Sql,Params).then(function(result){
-        if(result.affectedRows){
-            res.json({status:0})
-        }else{
-            res.json({status:1})
-        }
+//从wenzhang表里 统计文章总数
+//参数 无
+router.get('/admin/wenzhang/num',function(req,res){
+    var Sql="select count(wenzhang_id) as num from wenzhang";
+    promise.promiseSql(Sql).then(function(result){
+        var count=result[0].num;
+        res.json({status:0,count:count})
     },function(err){
         if(err)res.json({status:1})
     })
 })
+
+
 //从wenzhang表里    查询数据
 //参数 pageIndex=1  sort 排序类别   isdesc=0 底到高排序 isdesc=1高到底
 //sort=ip 按流量排序 sort=create_time按时间排序
 //sort=click 按点赞排序 
-router.get('/youke/wenzhang/select/sort',function(req,res){
+router.get('/admin/wenzhang/select/sort',function(req,res){
     var pageIndex=(req.query.pageIndex-1)*10;
     var sort=req.query.sort;
     var isdesc=req.query.isdesc;
@@ -270,7 +175,7 @@ router.get('/youke/wenzhang/select/sort',function(req,res){
         return;  //当传参值报错则停止下面的程序执行
     }
     var Params=[pageIndex];
-    var Sql="select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time,wenzhang_youke_ip_num"+
+    var Sql="select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_create_time,wenzhang_youke_ip_num"+
     ",wenzhang_youke_click_num from wenzhang   order by "+ sort+" "+paixu+" limit ?,10";
     promise.promiseParams(Sql,Params).then(function(result){
             res.json({status:0,result}) 
@@ -279,35 +184,6 @@ router.get('/youke/wenzhang/select/sort',function(req,res){
     })
 
 })
-//从wenzhang表里 查询数据
-//参数 sort 类别  
-//默认按流量排序  sort=javascript
-//sort=html sort=css vue node sort=qita
-router.get('/youke/wenzhang/select/sorts',function(req,res){
-    var sort=req.query.sort;
-    var Sql=" select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time,wenzhang_youke_ip_num "
-    +" from wenzhang  where wenzhang_sort = ? order by  wenzhang_youke_ip_num desc ";
-    var Params=[sort];
-    promise.promiseParams(Sql,Params).then(function(result){
-            res.json({status:0,result})
-    },function(err){
-        if(err)res.json({status:1})
-    })
-})
-//从wenzhang表里  根据wenzhang_id查询数据
-//动态params id
-router.get("/youke/wenzhang/select/:id",function(req,res){
-    var wenzhang_id=req.params.id;
-    var Sql="select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time from wenzhang where wenzhang_id=?";
-    var Params=[wenzhang_id];
-    promise.promiseParams(Sql,Params).then(function(result){
-
-            res.json({status:0,result})
-
-    },function(err){
-        res.json({status:1})
-    })
-})  
 
 
 //从images表里 插入一条数据
@@ -342,19 +218,6 @@ router.get("/admin/images/delete",function(req,res){
         }
     },function(err){
         res.json({status:1})
-    })
-})
-//从images表里 查询数据 根据img_position图片位置
-//参数 img_position
-//img_position=left,right,bottom,top四种
-router.get('/youke/images/select',function(req,res){
-    var img_position=req.query.img_position;
-    var Sql="select img_id,img_url from  images where img_position=?";
-    var Params=[img_position];
-    promise.promiseParams(Sql,Params).then(function(result){
-        res.json({status:0,result})
-    },function(err){
-        if(err)res.json({status:1})
     })
 })
 
@@ -415,29 +278,7 @@ router.get('/admin/wenzhang_caogao/select',function(req,res){
         if(err)res.json({status:1})
     })
 })
-//youke表是统计除了文章外的页面游客 插入一条数据
-//第一先判断游客cookie是否已经在youke表存在,如果存在则不插入信息
-//第二如果不存在则插入信息
-router.get("/youke/insert",function(req,res){
-    var arr_ip=req.ip.split(":");
-    var youke_ip=arr_ip[arr_ip.length-1]; //获取ip
-    if(req.signedCookies.token){  //游客存在cookie则不插入游客信息
-        res.json({status:0})
-    }else{ //游客信息不存在  插入游客信息
-        var time=formatDate.Timecha();
-        var settime=new Date().getTime();//时间戳
-        res.cookie('token',settime,{maxAge:time,signed:true,httpOnly:false});
-        var Sql="insert into youke values(null,?,now())";
-        var Params=[youke_ip];
-        promise.promiseParams(Sql,Params).then(function(result){
-            if (result.affectedRows) {
-                res.json({status:0})
-            }
-        },function(err){
-            if(err)res.json({status:1})
-        })
-    }
-})
+
 //从youke表和fangwen表里 统计总流量 ip
 //没有参数
 router.get("/admin/ips",function(req,res){
@@ -496,54 +337,7 @@ router.post('/admin/login',function(req,res){
         })
     }
 })
-//在comments表里 插入一条评论 
-//参数 id   name content parent_id文章的id 评论者的名字 评论内容 父级评论 0为父级
-router.post('/youke/comments/insert',function(req,res){
-    var wenzhang_id=req.body.id;
-    var comment_name=req.body.name;
-    var comment_content=req.body.content;
-    var parent_id=req.body.parent_id;
-    var Sql="insert into comments values(null,?,?,?,now(),?)";
-    var Params=[wenzhang_id,comment_content,comment_name,parent_id];
-    promise.promiseParams(Sql,Params).then(function(result){
-        if(result.affectedRows){
-            res.json({status:0})
-        }else{
-            res.json({status:1})
-        }
-    },function(err){
-        if(err)res.json({status:1})
-    })
-})
-//在user_name中 插入一条数据
-//第一先判断comment_name是否存在
-//不存在，则插入一条评论信息  //把comment_name保存在浏览器本地
-//存在则返回 hasName=true 名字存在
-//参数  name 评论名
-router.get('/youke/user_name/insert',function(req,res){
-    if(req.query.name==null){
-        res.json({status:2})
-        return;
-    }
-    var comment_name=req.query.name;
-    var Sql="select * from user_name where comment_name=?";
-    var Params=[comment_name];
-    promise.promiseParams(Sql,Params).then(function(result){
-        if(result.length>0){
-            res.json({hasName:true})
-        }else if(result.length==0){
-            var Sql="insert into user_name values(null,?)";
-            var Params=[comment_name];
-            promise.promiseParams(Sql,Params).then(function(result){
-                if(result.affectedRows){
-                    res.json({status:0})
-                }
-            })
-        }
-    }).catch(function(err){
-        if(err)res.json({status:1})
-    })
-})
+
 //从user_name表查询 评论注册人数
 //参数 无
 router.get('/admin/user_name/num',function(req,res){
@@ -560,38 +354,7 @@ router.get('/admin/user_name/num',function(req,res){
         if(err)res.json({status:1})
     })
 })
-//从 comments 表里查询评论信息 
-// 参数 id 文章id
-router.get('/youke/comments/select',function(req,res){
-    var wenzhang_id=req.query.id;
-    var params=[wenzhang_id];
-    var Sql="select comment_id,comment_content,comment_name,parent_id from comments where wenzhang_id=?";
-    promise.promiseParams(Sql,params).then(function(result){
-        if(result.length>0){
-            let  map = {}, root = [], i;
-            for(i = 0; i < result.length; i++) {
-                map[result[i].comment_id] = i
-                result[i].children = []
-            }
-            console.log(result)
-            for(i = 0; i < result.length; i++) {
-                const  node = result[i];
-                if(result[i].parent_id != 0) {
-                    result[map[node.parent_id]].children.push(node)
-                }else {
-                    root.push(node)
-                }
-            }
-            res.json({status:0,root})
-        }else{
-            res.json({status:1})
-        }
-    },function(err){
-        if(err)res.json({status:1})
-        throw(err)
-    })
-    
-})
+
 //从 comments表里删除一条信息
 //如果是一级评论则把二级的也删了
 //如果是二级直接删二级
@@ -618,6 +381,47 @@ router.get('/admin/comments/delete',function(req,res){
         throw(err)
     })
 })
+//从comments评论表里查询数据 
+//按照文章id排序
+//参数无
+router.get('/admin/comments/asc',function(req,res){
+    var Sql="select * from comments order by wenzhang_id desc";
+    promise.promiseSql(Sql).then(function(result){
+        if(result.length>0){
+            let  map = {}, root = [], i;
+            for(i = 0; i < result.length; i++) {
+                map[result[i].comment_id] = i
+                result[i].children = []
+            }
+            for(i = 0; i < result.length; i++) {
+                const  node = result[i];
+                if(result[i].parent_id != 0) {
+                    result[map[node.parent_id]].children.push(node)
+                }else {
+                    root.push(node)
+                }
+            }
+            res.json({status:0,root})
+        }else{
+            res.json({status:1})
+        }
+    },function(err){
+        if(err)res.json({status:1})
+    })
+})
+//从comments统计评论总数
+//参数无
+router.get('/admin/comment/num',function(req,res){
+    var Sql="select count(comment_id) as num from comments";
+    promise.promiseParams(Sql).then(function(result){
+        var count=result[0].num;
+        res.json({status:0,count:count})
+    },function(err){
+        res.json({status:1})
+    })
+})
+
+
 
 
 
