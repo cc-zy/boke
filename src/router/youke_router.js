@@ -11,11 +11,15 @@ const formatDate=require('../common/formatDate.js')
 //第二如果不存在设置cookie并存储wenzhang_id  和插入游客ip并更新文章浏览量 
 //cookie 今天到期
 router.get('/youke/wenzhang/ip',function(req,res){
+    if(req.query.id==null){
+        res.json({status:3})
+        return ;
+    }
     var arr_ip=req.ip.split(":"); 
     var wenzhang_id=req.query.id;
     var youke_ip=arr_ip[arr_ip.length-1]; //获取ip
     if(req.signedCookies.tokenid==wenzhang_id){ //文章对应的cookie存在则不插入游客ip
-        res.json({status:0})
+        res.json({status:1})
     }  else{
         var time=formatDate.Timecha();
         res.cookie("tokenid",wenzhang_id,{maxAge:time,signed:true,httpOnly:false});
@@ -205,7 +209,7 @@ router.post('/youke/comments/insert',function(req,res){
 //参数  name 评论名
 router.get('/youke/user_name/insert',function(req,res){
     if(req.query.name==null){
-        res.json({status:2})
+        res.json({status:1})
         return;
     }
     var comment_name=req.query.name;
@@ -241,7 +245,6 @@ router.get('/youke/comments/select',function(req,res){
                 map[result[i].comment_id] = i
                 result[i].children = []
             }
-            console.log(result)
             for(i = 0; i < result.length; i++) {
                 const  node = result[i];
                 if(result[i].parent_id != 0) {
@@ -256,7 +259,6 @@ router.get('/youke/comments/select',function(req,res){
         }
     },function(err){
         if(err)res.json({status:1})
-        throw(err)
     })
     
 })

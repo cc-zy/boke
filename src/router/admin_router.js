@@ -96,10 +96,10 @@ router.get('/admin/wenzhang/delete',function(req,res){
 router.post('/admin/wenzhang/update',function(req,res){
     var wenzhang_title=req.body.wenzhang_title;
     var wenzhang_content=req.body.wenzhang_content;
-    var wenzhang_content_html=req.body.wenzhang_content_html;
+    var wenzhang_html=req.body.wenzhang_html;
     var wenzhang_sort=req.body.wenzhang_sort;
     var wenzhang_id=req.body.id;
-    var Params=[wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_sort,wenzhang_id];
+    var Params=[wenzhang_title,wenzhang_content,wenzhang_html,wenzhang_sort,wenzhang_id];
     var Sql="update wenzhang set wenzhang_title=?,wenzhang_content=?,wenzhang_content_html=?,wenzhang_sort=?,wenzhang_change_time=now() where wenzhang_id=?";
     promise.promiseParams(Sql,Params).then(function(result){
         if(result.affectedRows){
@@ -164,7 +164,7 @@ router.get('/admin/wenzhang/select/sort',function(req,res){
             break;
         default :
             res.json({status:1}) //传参传错
-            break;
+            return;
     }
     if(isdesc==0){
         paixu='desc'; 
@@ -189,8 +189,8 @@ router.get('/admin/wenzhang/select/sort',function(req,res){
 //从images表里 插入一条数据
 //参数 img_url图片地址 img_position图片位置
 router.post('/admin/images/insert',function(req,res){
-    var img_url=req.query.img_url;
-    var img_position=req.query.img_position;
+    var img_url=req.body.img_url;
+    var img_position=req.body.img_position;
     var Sql="insert into images values(null,?,now(),?)";
     var Params=[img_url,img_position];
     promise.promiseParams(Sql,Params).then(function(result){
