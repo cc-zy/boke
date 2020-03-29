@@ -382,11 +382,13 @@ router.get('/admin/comments/delete',function(req,res){
     })
 })
 //从comments评论表里查询数据 
-//按照文章id排序
-//参数无
+//按照文章id排序 
+//参数pageIndex
 router.get('/admin/comments/asc',function(req,res){
-    var Sql="select * from comments order by wenzhang_id desc";
-    promise.promiseSql(Sql).then(function(result){
+    var pageIndex=(req.query.pageIndex-1)*10;
+    var Sql="select * from comments order by wenzhang_id desc limit  ?,10";
+    var Params=[pageIndex];
+    promise.promiseParams(Sql,Params).then(function(result){
         if(result.length>0){
             let  map = {}, root = [], i;
             for(i = 0; i < result.length; i++) {
@@ -401,9 +403,10 @@ router.get('/admin/comments/asc',function(req,res){
                     root.push(node)
                 }
             }
-            res.json({status:0,root})
+            result=root
+            res.json({status:0,result})
         }else{
-            res.json({status:1})
+            res.json({status:0,result})
         }
     },function(err){
         if(err)res.json({status:1})

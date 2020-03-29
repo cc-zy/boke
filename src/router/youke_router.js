@@ -113,18 +113,19 @@ router.get('/youke/wenzhang/sort',function(req,res){
 })
 
 //从wenzhang表里 查询数据
-//参数 sort 类别  
+//参数 sort 类别  pageIndex页数
 //默认按流量排序  sort=javascript
-//sort=html sort=css vue node sort=qita
+//sort=html sort=css vue node sort=qita 
 router.get('/youke/wenzhang/select/sorts',function(req,res){
-    if(req.query.sort==null){
+    if(req.query.sort==null||req.query.pageIndex==null){
         res.json({status:1})
         return;
     }
     var sort=req.query.sort;
+    var pageIndex=(req.query.pageIndex-1)*10;
     var Sql=" select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_content_html,wenzhang_create_time,wenzhang_youke_ip_num "
-    +" from wenzhang  where wenzhang_sort = ? order by  wenzhang_youke_ip_num desc ";
-    var Params=[sort];
+    +" from wenzhang  where wenzhang_sort = ? order by  wenzhang_youke_ip_num desc limit ?,10";
+    var Params=[sort,pageIndex];
     promise.promiseParams(Sql,Params).then(function(result){
             res.json({status:0,result})
     },function(err){
@@ -273,7 +274,7 @@ router.post('/youke/sousuo',function(req,res){
     var wenzhang_title=req.body.title;
     var pageIndex=(req.body.pageIndex-1)*10;
     var Params=[pageIndex];
-    var Sql=`select wenzhang_id,wenzhang_title,wenzhang_content from wenzhang where wenzhang_title like '%${wenzhang_title}%'  limit ?,10`;
+    var Sql=`select wenzhang_id,wenzhang_title,wenzhang_content,wenzhang_create_time from wenzhang where wenzhang_title like '%${wenzhang_title}%'  limit ?,10`;
     promise.promiseParams(Sql,Params).then(function(result){
         if(result.length>0){
             res.json({status:0,result})
